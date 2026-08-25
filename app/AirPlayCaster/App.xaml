@@ -1,0 +1,22 @@
+<Application x:Class="AirPlayCaster.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml"
+             ShutdownMode="OnExplicitShutdown">
+  <Application.Resources>
+    <SolidColorBrush x:Key="WindowBrush" Color="#F4F6FA" />
+    <SolidColorBrush x:Key="CardBrush" Color="White" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#246BFE" />
+    <SolidColorBrush x:Key="TextBrush" Color="#172033" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#667085" />
+    <Style TargetType="Button">
+      <Setter Property="Padding" Value="18,10" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style TargetType="ComboBox">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="10,5" />
+    </Style>
+  </Application.Resources>
+</Application>

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>AirPlay Caster</AssemblyName>
+    <RootNamespace>AirPlayCaster</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('..\..\test-runtime\airplay-sender.exe')">
+    <Content Include="..\..\test-runtime\airplay-sender.exe" Link="airplay-sender.exe" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\test-runtime\airplay-discover.exe" Link="airplay-discover.exe" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\test-runtime\ffmpeg.exe" Link="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,19 @@
+# .NET build output
+**/bin/
+**/obj/
+.vs/
+
+# Local application state and pairing credentials
+credentials.json
+*credentials*.json
+*.log
+
+# Editor and OS metadata
+.idea/
+.vscode/
+Thumbs.db
+Desktop.ini
+
+# Temporary runtime files
+test-runtime/hls/
+*.tmp
