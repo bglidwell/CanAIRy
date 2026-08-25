@@ -1,48 +1,84 @@
-# CanAIRy
+<div align="center">
+  <img src="app/CanAIRy/Assets/CanAIRy.png" alt="CanAIRy logo" width="180">
+  <h1>CanAIRy</h1>
+  <p><strong>Wireless Display Casting for Apple TV</strong></p>
+  <p>Cast your entire Windows desktop or one application window to an Apple TV on your local network.</p>
+  <p>
+    <a href="https://github.com/bglidwell/CanAIRy/actions/workflows/build.yml"><img src="https://github.com/bglidwell/CanAIRy/actions/workflows/build.yml/badge.svg" alt="Build status"></a>
+    <a href="https://github.com/bglidwell/CanAIRy/releases/latest"><img src="https://img.shields.io/github/v/release/bglidwell/CanAIRy?display_name=tag" alt="Latest release"></a>
+    <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-2684FF" alt="Windows 10 and 11">
+  </p>
+</div>
 
-**CanAIRy — Wireless Display Casting** is a native Windows tray application for
-casting an entire desktop or an individual app window to an Apple TV on the
-local network. It includes Apple TV discovery, PIN pairing, remembered
-receivers, real app-window previews, and automatic reconnection.
+<p align="center">
+  <img src="docs/images/canairy-main.png" alt="CanAIRy casting dashboard in dark mode" width="860">
+</p>
 
-[![Build](https://github.com/bglidwell/CanAIRy/actions/workflows/build.yml/badge.svg)](https://github.com/bglidwell/CanAIRy/actions/workflows/build.yml)
+## What it does
+
+CanAIRy is a native Windows tray application that discovers Apple TVs, handles
+PIN pairing, and streams a selected display or application window over your
+LAN. It is designed to stay out of the way until you need it.
+
+- Discover Apple TVs and compatible AirPlay receivers automatically.
+- Pair using the PIN displayed by the receiver and remember known devices.
+- Share an entire screen or only one visible application window.
+- Choose from live visual previews, with screens listed first.
+- Adjust frame rate, stream quality, and cursor visibility.
+- Start, stop, and switch destinations from the system tray.
+- Follow the Windows light or dark theme automatically.
+
+## Choose exactly what to share
+
+CanAIRy presents screens first, followed by scrollable previews of individual
+application windows—similar to the sharing experience in Teams or Zoom.
+
+<p align="center">
+  <img src="docs/images/canairy-source-picker.png" alt="CanAIRy screen and application picker" width="940">
+</p>
 
 ## Install
 
-Versioned releases provide two Windows x64 downloads:
+Download the current Windows x64 package from the
+[latest release](https://github.com/bglidwell/CanAIRy/releases/latest):
 
-- `CanAIRy-<version>-win-x64-setup.exe` — per-user installer with Start menu and
-  optional desktop shortcuts. It supports silent installation and does not
+- `CanAIRy-<version>-win-x64-setup.exe` — per-user installer with Start menu
+  and optional desktop shortcuts. It supports silent installation and does not
   require administrator privileges.
 - `CanAIRy-<version>-win-x64-portable.zip` — self-contained portable folder.
 
-Until the first release is published, build the app locally with:
+The application is not yet Authenticode-signed, so Windows may display a
+SmartScreen warning for early releases.
+
+## Quick start
+
+1. Connect the Windows PC and Apple TV to the same local network.
+2. Open CanAIRy and select the destination Apple TV.
+3. Choose a screen or application window.
+4. Select **Start casting** and enter the Apple TV PIN if prompted.
+5. Use the CanAIRy tray menu to stop casting or switch sources later.
+
+## Build from source
+
+The desktop application targets .NET 10 and the AirPlay helpers are written in
+Go. Build the Windows application with:
 
 ```powershell
 dotnet build app\CanAIRy\CanAIRy.csproj -c Release
 ```
 
-## Releases
+The GitHub **Build** workflow tests the Windows-compatible Go packages and
+builds the native application on every push and pull request.
 
-Pushing a semantic version tag builds and publishes a GitHub Release:
+## Releases and WinGet
 
-```powershell
-git tag v0.1.0
-git push origin v0.1.0
-```
+Pushing a semantic version tag builds the Go helpers, publishes a self-contained
+Windows application, creates an Inno Setup installer and portable ZIP, generates
+SHA-256 checksums, and attaches everything to a GitHub Release.
 
-The **Release** workflow can also be run manually to build and download an
-installer artifact without publishing a GitHub Release.
-
-Optional Authenticode signing is enabled when the repository contains the
-`WINDOWS_CERTIFICATE_BASE64` and `WINDOWS_CERTIFICATE_PASSWORD` Actions secrets.
-
-## WinGet
-
-The proposed package identifier is `BobbyGlidwell.CanAIRy`. The initial package
-must be submitted to Microsoft's community repository after the first stable
-GitHub release. Later version submissions can be automated with the included
-**Submit WinGet update** workflow. See [distribution/WINGET.md](distribution/WINGET.md).
+The proposed WinGet package identifier is `BobbyGlidwell.CanAIRy`. See
+[distribution/WINGET.md](distribution/WINGET.md) for initial submission and
+automated update instructions.
 
 ## Third-party components
 
@@ -50,3 +86,7 @@ The AirPlay sender is derived from `omarroth/doubletake`, and FFmpeg is included
 for Windows screen capture and H.264 encoding. See
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and the license texts under
 `sender/`.
+
+---
+
+<p align="center">Created by Bobby Glidwell</p>
