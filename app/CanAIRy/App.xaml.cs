@@ -1,4 +1,4 @@
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 public partial class App : System.Windows.Application
 {

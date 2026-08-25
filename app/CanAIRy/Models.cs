@@ -1,4 +1,4 @@
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 public sealed class Receiver
 {

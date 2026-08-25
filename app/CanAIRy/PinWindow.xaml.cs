@@ -1,4 +1,4 @@
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 public partial class PinWindow : System.Windows.Window
 {

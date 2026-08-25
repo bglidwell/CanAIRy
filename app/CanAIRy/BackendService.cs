@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 internal sealed class BackendService : IAsyncDisposable
 {
@@ -31,11 +31,7 @@ internal sealed class BackendService : IAsyncDisposable
     {
         get
         {
-            var folder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "AirPlay Caster");
-            Directory.CreateDirectory(folder);
-            return Path.Combine(folder, "credentials.json");
+            return ProductInfo.DataFile("credentials.json");
         }
     }
 

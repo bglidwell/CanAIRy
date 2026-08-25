@@ -6,12 +6,19 @@
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <AssemblyName>AirPlay Caster</AssemblyName>
-    <RootNamespace>AirPlayCaster</RootNamespace>
+    <AssemblyName>CanAIRy</AssemblyName>
+    <RootNamespace>CanAIRy</RootNamespace>
+    <Product>CanAIRy — Wireless Display Casting</Product>
+    <Description>Cast your Windows desktop or an app to Apple TV over your local network.</Description>
+    <ApplicationIcon>Assets\CanAIRy.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup Condition="Exists('..\..\test-runtime\airplay-sender.exe')">
     <Content Include="..\..\test-runtime\airplay-sender.exe" Link="airplay-sender.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\test-runtime\airplay-discover.exe" Link="airplay-discover.exe" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\..\test-runtime\ffmpeg.exe" Link="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\CanAIRy.ico" />
+    <Resource Include="Assets\CanAIRy.png" />
   </ItemGroup>
 </Project>

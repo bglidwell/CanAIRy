@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 internal static class WindowCatalog
 {

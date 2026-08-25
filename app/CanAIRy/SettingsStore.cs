@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.IO;
 using Microsoft.Win32;
 
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 internal sealed class AppSettings
 {
@@ -17,12 +17,11 @@ internal sealed class AppSettings
 internal static class SettingsStore
 {
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string RunValue = "AirPlay Caster";
+    private const string RunValue = "CanAIRy";
+    private const string LegacyRunValue = "AirPlay Caster";
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public static string SettingsPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "AirPlay Caster", "settings.json");
+    public static string SettingsPath => ProductInfo.DataFile("settings.json");
 
     public static bool HasSettings => File.Exists(SettingsPath);
 
@@ -50,7 +49,13 @@ internal static class SettingsStore
         get
         {
             using var key = Registry.CurrentUser.OpenSubKey(RunKey, false);
-            return key?.GetValue(RunValue) is string;
+            if (key?.GetValue(RunValue) is string) return true;
+            if (key?.GetValue(LegacyRunValue) is not string) return false;
+
+            using var writableKey = Registry.CurrentUser.CreateSubKey(RunKey, true);
+            writableKey.SetValue(RunValue, $"\"{Environment.ProcessPath}\" --tray", RegistryValueKind.String);
+            writableKey.DeleteValue(LegacyRunValue, false);
+            return true;
         }
         set
         {
@@ -59,6 +64,7 @@ internal static class SettingsStore
                 key.SetValue(RunValue, $"\"{Environment.ProcessPath}\" --tray", RegistryValueKind.String);
             else
                 key.DeleteValue(RunValue, false);
+            key.DeleteValue(LegacyRunValue, false);
         }
     }
 }

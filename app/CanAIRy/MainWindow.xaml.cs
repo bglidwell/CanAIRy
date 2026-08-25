@@ -4,7 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using Forms = System.Windows.Forms;
 
-namespace AirPlayCaster;
+namespace CanAIRy;
 
 public partial class MainWindow : Window
 {
@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     private readonly CancellationTokenSource _lifetime = new();
     private readonly AppSettings _settings = SettingsStore.Load();
     private readonly Forms.NotifyIcon _trayIcon;
+    private readonly System.Drawing.Icon _appIcon;
     private bool _allowExit;
     private bool _stopRequested;
     private StreamOptions? _activeOptions;
@@ -31,10 +32,11 @@ public partial class MainWindow : Window
         BitrateBox.SelectedIndex = _settings.BitrateKbps switch { 4500 => 1, 8000 => 2, _ => 0 };
         CursorCheck.IsChecked = _settings.ShowCursor;
 
+        _appIcon = LoadAppIcon();
         _trayIcon = new Forms.NotifyIcon
         {
-            Text = "AirPlay Caster",
-            Icon = System.Drawing.SystemIcons.Application,
+            Text = ProductInfo.DisplayName,
+            Icon = _appIcon,
             Visible = true,
             ContextMenuStrip = new Forms.ContextMenuStrip()
         };
@@ -61,6 +63,17 @@ public partial class MainWindow : Window
             e.Cancel = true;
             Hide();
         };
+    }
+
+    private static System.Drawing.Icon LoadAppIcon()
+    {
+        try
+        {
+            if (Environment.ProcessPath is { } path && System.Drawing.Icon.ExtractAssociatedIcon(path) is { } icon)
+                return icon;
+        }
+        catch { }
+        return (System.Drawing.Icon)System.Drawing.SystemIcons.Application.Clone();
     }
 
     private async Task RefreshDevicesAsync()
@@ -114,7 +127,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            System.Windows.MessageBox.Show(this, ex.Message, "AirPlay Caster", MessageBoxButton.OK, MessageBoxImage.Error);
+            System.Windows.MessageBox.Show(this, ex.Message, ProductInfo.DisplayName, MessageBoxButton.OK, MessageBoxImage.Error);
             SetStatus("Ready");
         }
     }
@@ -271,7 +284,7 @@ public partial class MainWindow : Window
                 SourceBox.SelectedItem = _sources.FirstOrDefault(candidate => candidate.WindowTitle == source.WindowTitle) ?? source;
                 await StartSessionAsync(SelectedOptions(false));
             }
-            catch (Exception ex) { System.Windows.MessageBox.Show(ex.Message, "AirPlay Caster"); }
+            catch (Exception ex) { System.Windows.MessageBox.Show(ex.Message, ProductInfo.DisplayName); }
         });
         parent.DropDownItems.Add(item);
     }
@@ -293,6 +306,7 @@ public partial class MainWindow : Window
         await _backend.DisposeAsync();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
+        _appIcon.Dispose();
         System.Windows.Application.Current.Shutdown();
     }
 
