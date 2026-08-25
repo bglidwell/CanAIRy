@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version for a test artifact (for example 0.1.0)"
+        required: true
+        default: "0.1.0"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-2025
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Validate version tag
+        id: version
+        shell: pwsh
+        run: |
+          $candidate = if ("${{ github.event_name }}" -eq "push") {
+            "${{ github.ref_name }}".TrimStart('v')
+          } else {
+            "${{ inputs.version }}"
+          }
+          if ($candidate -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "Version must look like 0.1.0 or 0.1.0-beta.1"
+          }
+          "version=$candidate" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: sender/go.mod
+          cache-dependency-path: sender/go.sum
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test and build AirPlay helpers
+        shell: pwsh
+        run: |
+          Push-Location sender
+          go test ./cmd/doubletake ./cmd/airplay-discover
+          go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-sender.exe .\cmd\doubletake
+          go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-discover.exe .\cmd\airplay-discover
+          Pop-Location
+
+      - name: Publish self-contained application
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          dotnet publish app\CanAIRy\CanAIRy.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            -p:Version=$version `
+            -p:ContinuousIntegrationBuild=true `
+            --output artifacts\publish
+          Copy-Item THIRD-PARTY-NOTICES.md artifacts\publish\
+          Copy-Item sender\LICENSE artifacts\publish\DOUBLETAKE-LGPL-3.0.txt
+          Copy-Item sender\COPYING.GPL artifacts\publish\GNU-GPL-3.0.txt
+
+      - name: Detect signing certificate
+        id: signing
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+        shell: pwsh
+        run: |
+          $configured = -not [string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)
+          "configured=$($configured.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Sign application when certificate is configured
+        if: ${{ steps.signing.outputs.configured == 'true' }}
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'CanAIRy-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signTool) { throw 'signtool.exe was not found' }
+          & $signTool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+            /f $certificatePath /p $env:CERTIFICATE_PASSWORD artifacts\publish\CanAIRy.exe
+          Remove-Item -LiteralPath $certificatePath -Force
+
+      - name: Build portable archive and installer
+        env:
+          CANAIRY_VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts\release | Out-Null
+          $env:CANAIRY_PUBLISH_DIR = (Resolve-Path artifacts\publish).Path
+          $env:CANAIRY_RELEASE_DIR = (Resolve-Path artifacts\release).Path
+          $portable = "artifacts\release\CanAIRy-$env:CANAIRY_VERSION-win-x64-portable.zip"
+          Compress-Archive -Path artifacts\publish\* -DestinationPath $portable -CompressionLevel Optimal
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path -LiteralPath $iscc)) { throw 'Inno Setup compiler was not found' }
+          & $iscc installer\CanAIRy.iss
+
+      - name: Sign installer when certificate is configured
+        if: ${{ steps.signing.outputs.configured == 'true' }}
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+          CANAIRY_VERSION: ${{ steps.version.outputs.version }}
+        shell: pwsh
+        run: |
+          $certificatePath = Join-Path $env:RUNNER_TEMP 'CanAIRy-signing.pfx'
+          [IO.File]::WriteAllBytes($certificatePath, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
+          $signTool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          & $signTool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
+            /f $certificatePath /p $env:CERTIFICATE_PASSWORD `
+            "artifacts\release\CanAIRy-$env:CANAIRY_VERSION-win-x64-setup.exe"
+          Remove-Item -LiteralPath $certificatePath -Force
+
+      - name: Create checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts\release -File | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content artifacts\release\SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CanAIRy-${{ steps.version.outputs.version }}-win-x64
+          path: artifacts/release/*
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ github.event_name == 'push' }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $files = Get-ChildItem artifacts\release -File | ForEach-Object FullName
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $files --clobber
+          } else {
+            gh release create $tag $files --verify-tag --generate-notes --title "CanAIRy ${{ steps.version.outputs.version }}"
+          }

@@ -1,0 +1,42 @@
+name: Submit WinGet update
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Released version, without the leading v (for example 0.1.1)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  submit:
+    runs-on: windows-2025
+    steps:
+      - name: Validate release and token
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          if ("${{ inputs.version }}" -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw 'Version must look like 0.1.1 or 0.1.1-beta.1'
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_TOKEN)) {
+            throw 'Add WINGET_CREATE_GITHUB_TOKEN as a repository Actions secret first.'
+          }
+
+      - name: Download WinGet Manifest Creator
+        shell: pwsh
+        run: Invoke-WebRequest https://aka.ms/wingetcreate/latest -OutFile wingetcreate.exe
+
+      - name: Submit package update
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_CREATE_GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          $installerUrl = "https://github.com/bglidwell/CanAIRy/releases/download/v$version/CanAIRy-$version-win-x64-setup.exe"
+          Invoke-WebRequest $installerUrl -Method Head | Out-Null
+          .\wingetcreate.exe update BobbyGlidwell.CanAIRy -u $installerUrl -v $version -t $env:WINGET_TOKEN --submit

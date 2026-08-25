@@ -16,4 +16,5 @@ Desktop.ini
 
 # Temporary runtime files
 test-runtime/hls/
+/artifacts/
 *.tmp

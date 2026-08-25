@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: sender/go.mod
+          cache-dependency-path: sender/go.sum
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Test and build AirPlay helpers
+        shell: pwsh
+        run: |
+          Push-Location sender
+          go test ./cmd/doubletake ./cmd/airplay-discover
+          go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-sender.exe .\cmd\doubletake
+          go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-discover.exe .\cmd\airplay-discover
+          Pop-Location
+
+      - name: Build CanAIRy
+        shell: pwsh
+        run: dotnet build app\CanAIRy\CanAIRy.csproj --configuration Release

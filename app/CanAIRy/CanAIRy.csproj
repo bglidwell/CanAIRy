@@ -10,6 +10,11 @@
     <RootNamespace>CanAIRy</RootNamespace>
     <Product>CanAIRy — Wireless Display Casting</Product>
     <Description>Cast your Windows desktop or an app to Apple TV over your local network.</Description>
+    <Version>0.1.0</Version>
+    <Company>Bobby Glidwell</Company>
+    <Authors>Bobby Glidwell</Authors>
+    <Copyright>Copyright © 2026 Bobby Glidwell</Copyright>
+    <RepositoryUrl>https://github.com/bglidwell/CanAIRy</RepositoryUrl>
     <ApplicationIcon>Assets\CanAIRy.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup Condition="Exists('..\..\test-runtime\airplay-sender.exe')">
