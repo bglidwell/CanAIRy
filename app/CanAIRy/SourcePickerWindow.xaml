@@ -1,0 +1,110 @@
+<Window x:Class="CanAIRy.SourcePickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="CanAIRy — Choose what to share" Icon="Assets/CanAIRy.ico"
+        Width="940" Height="680" MinWidth="700" MinHeight="520" ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource WindowBrush}"
+        Foreground="{DynamicResource TextBrush}" FontFamily="Segoe UI" UseLayoutRounding="True">
+  <Window.Resources>
+    <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    <Style x:Key="ShareTileStyle" TargetType="Button">
+      <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Margin" Value="6" />
+      <Setter Property="Width" Value="270" />
+      <Setter Property="Height" Value="205" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="TileBorder" CornerRadius="12" Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+              <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="TileBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                <Setter TargetName="TileBorder" Property="Background" Value="{DynamicResource HoverBrush}" />
+              </Trigger>
+              <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                <Setter TargetName="TileBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                <Setter TargetName="TileBorder" Property="BorderThickness" Value="2" />
+              </DataTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <DataTemplate x:Key="SourceTileTemplate">
+      <Button Style="{StaticResource ShareTileStyle}" Tag="{Binding}" Click="SourceTile_Click">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="148" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+          <Border Margin="7,7,7,0" CornerRadius="8" Background="{DynamicResource SurfaceAltBrush}" ClipToBounds="True">
+            <Grid>
+              <Viewbox Width="58" Height="58" Opacity="0.36">
+                <Path Fill="{DynamicResource MutedBrush}" Data="M2,3 H22 A2,2 0 0 1 24,5 V17 A2,2 0 0 1 22,19 H14 V21 H18 V23 H6 V21 H10 V19 H2 A2,2 0 0 1 0,17 V5 A2,2 0 0 1 2,3 M2,5 V17 H22 V5 Z" />
+              </Viewbox>
+              <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+              <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8" Padding="7,4" CornerRadius="7"
+                      Background="#CC101820" Visibility="{Binding IsSelected, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="Selected" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+              </Border>
+            </Grid>
+          </Border>
+          <Grid Grid.Row="1" Margin="12,9">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="34" /><ColumnDefinition /></Grid.ColumnDefinitions>
+            <Border Width="27" Height="27" CornerRadius="6" Background="{DynamicResource SurfaceAltBrush}">
+              <Grid>
+                <Path Width="17" Height="14" Stretch="Fill" Fill="{DynamicResource MutedBrush}"
+                      Data="M2,1 H22 A2,2 0 0 1 24,3 V15 A2,2 0 0 1 22,17 H14 V20 H18 V22 H6 V20 H10 V17 H2 A2,2 0 0 1 0,15 V3 A2,2 0 0 1 2,1 M2,3 V15 H22 V3 Z" />
+                <Image Source="{Binding Source.AppIcon}" Width="22" Height="22" Stretch="Uniform" />
+              </Grid>
+            </Border>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Source.DisplayTitle}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Source.Subtitle}" FontSize="11" Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </Grid>
+        </Grid>
+      </Button>
+    </DataTemplate>
+  </Window.Resources>
+
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid Margin="28,22,28,14">
+      <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="Choose what to share" FontSize="25" FontWeight="SemiBold" />
+        <TextBlock Text="Select a screen or an individual app window" Margin="0,3,0,0" Foreground="{DynamicResource MutedBrush}" />
+      </StackPanel>
+      <Button Grid.Column="1" Content="Refresh previews" VerticalAlignment="Center" Click="Refresh_Click" />
+    </Grid>
+
+    <ScrollViewer Grid.Row="1" Margin="22,0,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <StackPanel Margin="6,4,6,12">
+        <TextBlock Text="Screens" FontSize="17" FontWeight="SemiBold" Margin="6,0,0,5" />
+        <TextBlock Text="Share everything visible on a display" Foreground="{DynamicResource MutedBrush}" Margin="6,0,0,8" />
+        <ItemsControl ItemsSource="{Binding ScreenTiles}" ItemTemplate="{StaticResource SourceTileTemplate}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        </ItemsControl>
+        <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="6,16,6,18" />
+        <TextBlock Text="Windows" FontSize="17" FontWeight="SemiBold" Margin="6,0,0,5" />
+        <TextBlock Text="Share only one application window" Foreground="{DynamicResource MutedBrush}" Margin="6,0,0,8" />
+        <ItemsControl ItemsSource="{Binding WindowTiles}" ItemTemplate="{StaticResource SourceTileTemplate}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+
+    <Border Grid.Row="2" BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0" Padding="28,13">
+      <Grid>
+        <TextBlock Text="Click a preview to share it" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" />
+        <Button Content="Cancel" IsCancel="True" HorizontalAlignment="Right" />
+      </Grid>
+    </Border>
+  </Grid>
+</Window>

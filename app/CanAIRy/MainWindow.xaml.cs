@@ -119,7 +119,7 @@ public partial class MainWindow : Window
         PreviewPlaceholder.Visibility = Visibility.Visible;
         try
         {
-            var thumbnail = await Task.Run(() => WindowCatalog.CaptureThumbnail(source), _lifetime.Token);
+            var thumbnail = await Task.Run(() => WindowCatalog.CaptureThumbnail(source, 320, 180), _lifetime.Token);
             if (generation != _previewGeneration || SourceBox.SelectedItem != source) return;
             PreviewImage.Source = thumbnail;
             PreviewPlaceholder.Visibility = thumbnail is null ? Visibility.Visible : Visibility.Collapsed;
@@ -332,6 +332,27 @@ public partial class MainWindow : Window
 
     private async void RefreshDevices_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
     private void RefreshSources_Click(object sender, RoutedEventArgs e) { RefreshSources(); UpdateButtons(); }
+    private void ChooseSource_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var available = WindowCatalog.GetSources();
+            var picker = new SourcePickerWindow(available, SourceBox.SelectedItem as CaptureSource) { Owner = this };
+            if (picker.ShowDialog() != true || picker.SelectedSource is not { } selected) return;
+
+            _sources.Clear();
+            foreach (var source in available) _sources.Add(source);
+            if (!_sources.Any(source => source.IsDesktop == selected.IsDesktop && source.WindowHandle == selected.WindowHandle))
+                _sources.Add(selected);
+            SourceBox.SelectedItem = _sources.First(source => source.IsDesktop == selected.IsDesktop && source.WindowHandle == selected.WindowHandle);
+            UpdateButtons();
+        }
+        catch (Exception ex)
+        {
+            AppendLog("Source picker failed: " + ex);
+            System.Windows.MessageBox.Show(this, ex.Message, ProductInfo.DisplayName, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
     private async void Start_Click(object sender, RoutedEventArgs e) => await StartAsync(false);
     private async void Pair_Click(object sender, RoutedEventArgs e) => await StartAsync(true);
     private async void Stop_Click(object sender, RoutedEventArgs e) => await StopSessionAsync();
@@ -345,7 +366,10 @@ public partial class MainWindow : Window
         if (ReceiverBox.SelectedItem is Receiver receiver)
             ReceiverDetail.Text = $"{receiver.Ip}:{receiver.Port}  ·  {receiver.DeviceId}";
         if (sender == SourceBox && SourceBox.SelectedItem is CaptureSource source)
+        {
+            SelectedSourceSubtitle.Text = source.Subtitle;
             _ = UpdatePreviewAsync(source);
+        }
         if (IsLoaded) SaveSettings();
         UpdateButtons();
     }

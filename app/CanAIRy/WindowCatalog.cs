@@ -101,11 +101,13 @@ internal static class WindowCatalog
             .ToArray();
     }
 
-    public static BitmapSource? CaptureThumbnail(CaptureSource source)
+    public static BitmapSource? CaptureThumbnail(CaptureSource source, int maxWidth = 720, int maxHeight = 405)
     {
         try
         {
-            return source.IsDesktop ? CaptureDesktop() : CaptureWindow(source.WindowHandle);
+            return source.IsDesktop
+                ? CaptureDesktop(maxWidth, maxHeight)
+                : CaptureWindow(source.WindowHandle, maxWidth, maxHeight);
         }
         catch
         {
@@ -134,17 +136,17 @@ internal static class WindowCatalog
         }
     }
 
-    private static BitmapSource? CaptureDesktop()
+    private static BitmapSource? CaptureDesktop(int maxWidth, int maxHeight)
     {
         var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
         if (bounds.Width <= 0 || bounds.Height <= 0) return null;
         using var bitmap = new Drawing.Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
         using (var graphics = Drawing.Graphics.FromImage(bitmap))
             graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, Drawing.CopyPixelOperation.SourceCopy);
-        return ToBitmapSource(bitmap, 720, 405);
+        return ToBitmapSource(bitmap, maxWidth, maxHeight);
     }
 
-    private static BitmapSource? CaptureWindow(IntPtr handle)
+    private static BitmapSource? CaptureWindow(IntPtr handle, int maxWidth, int maxHeight)
     {
         if (handle == IntPtr.Zero || !IsWindowVisible(handle)) return null;
         if (DwmGetWindowAttribute(handle, DwmExtendedFrameBounds, out NativeRect rect, Marshal.SizeOf<NativeRect>()) != 0 &&
@@ -159,7 +161,7 @@ internal static class WindowCatalog
         bool captured;
         try { captured = PrintWindow(handle, deviceContext, PrintWindowRenderFullContent); }
         finally { graphics.ReleaseHdc(deviceContext); }
-        return captured ? ToBitmapSource(bitmap, 720, 405) : null;
+        return captured ? ToBitmapSource(bitmap, maxWidth, maxHeight) : null;
     }
 
     private static BitmapSource ToBitmapSource(Drawing.Bitmap source, int maxWidth, int maxHeight)
