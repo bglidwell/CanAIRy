@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="CanAIRy — Pair Apple TV" Height="245" Width="430"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        Background="{StaticResource WindowBrush}">
+        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}">
   <Grid Margin="28">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -11,12 +11,12 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
-    <TextBlock Text="Enter the code on your Apple TV" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-    <TextBlock Grid.Row="1" Margin="0,8,0,16" Text="The pairing code is shown on the selected receiver." Foreground="{StaticResource MutedBrush}" />
-    <TextBox x:Name="PinBox" Grid.Row="2" Height="46" FontSize="23" MaxLength="12" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+    <TextBlock Text="Enter the code on your Apple TV" FontSize="20" FontWeight="SemiBold" />
+    <TextBlock Grid.Row="1" Margin="0,8,0,16" Text="The pairing code is shown on the selected receiver." Foreground="{DynamicResource MutedBrush}" />
+    <TextBox x:Name="PinBox" Grid.Row="2" Height="46" Padding="10" FontSize="23" MaxLength="12" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
     <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,18,0,0">
       <Button Content="Cancel" IsCancel="True" Margin="0,0,10,0" />
-      <Button Content="Pair" IsDefault="True" Click="Pair_Click" Background="{StaticResource AccentBrush}" Foreground="White" BorderThickness="0" />
+      <Button Content="Pair" IsDefault="True" Click="Pair_Click" Style="{StaticResource PrimaryButtonStyle}" />
     </StackPanel>
   </Grid>
 </Window>

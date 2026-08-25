@@ -1,3 +1,5 @@
+using System.Windows.Media;
+
 namespace CanAIRy;
 
 public sealed class Receiver
@@ -16,7 +18,12 @@ public sealed class CaptureSource
 {
     public string Name { get; init; } = "";
     public string? WindowTitle { get; init; }
+    public string AppName { get; init; } = "";
+    public IntPtr WindowHandle { get; init; }
+    public ImageSource? AppIcon { get; init; }
     public bool IsDesktop => WindowTitle is null;
+    public string DisplayTitle => IsDesktop ? "Entire desktop" : WindowTitle ?? Name;
+    public string Subtitle => IsDesktop ? "All screens and apps" : AppName;
     public override string ToString() => Name;
 }
 

@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using Forms = System.Windows.Forms;
 
 namespace CanAIRy;
@@ -19,10 +18,14 @@ public partial class MainWindow : Window
     private bool _stopRequested;
     private StreamOptions? _activeOptions;
     private int _reconnectAttempt;
+    private int _previewGeneration;
 
     public MainWindow()
     {
         InitializeComponent();
+        ThemeService.Attach(this);
+        var version = typeof(App).Assembly.GetName().Version;
+        VersionText.Text = version is null ? "Version 1.0" : $"Version {version.Major}.{version.Minor}.{version.Build}";
         ReceiverBox.ItemsSource = _receivers;
         SourceBox.ItemsSource = _sources;
         foreach (var receiver in _settings.KnownReceivers) _receivers.Add(receiver);
@@ -108,6 +111,22 @@ public partial class MainWindow : Window
         SourceBox.SelectedItem = _sources.FirstOrDefault(item => item.WindowTitle == selectedTitle) ?? _sources.FirstOrDefault();
     }
 
+    private async Task UpdatePreviewAsync(CaptureSource source)
+    {
+        var generation = Interlocked.Increment(ref _previewGeneration);
+        PreviewTitle.Text = source.DisplayTitle;
+        PreviewImage.Source = null;
+        PreviewPlaceholder.Visibility = Visibility.Visible;
+        try
+        {
+            var thumbnail = await Task.Run(() => WindowCatalog.CaptureThumbnail(source), _lifetime.Token);
+            if (generation != _previewGeneration || SourceBox.SelectedItem != source) return;
+            PreviewImage.Source = thumbnail;
+            PreviewPlaceholder.Visibility = thumbnail is null ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (OperationCanceledException) { }
+    }
+
     private StreamOptions SelectedOptions(bool forcePair)
     {
         var receiver = ReceiverBox.SelectedItem as Receiver ?? throw new InvalidOperationException("Select an Apple TV");
@@ -178,13 +197,14 @@ public partial class MainWindow : Window
     private void SetStatus(string status)
     {
         StatusText.Text = status;
-        StatusDot.Fill = status switch
+        var brushKey = status switch
         {
-            "Mirroring" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(18, 183, 106)),
-            "Connection lost" or "Disconnected" or "Discovery failed" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(240, 68, 56)),
-            "Ready" => new SolidColorBrush(System.Windows.Media.Color.FromRgb(36, 107, 254)),
-            _ => new SolidColorBrush(System.Windows.Media.Color.FromRgb(247, 144, 9))
+            "Mirroring" => "SuccessBrush",
+            "Connection lost" or "Disconnected" or "Discovery failed" => "DangerBrush",
+            "Ready" => "AccentBrush",
+            _ => "WarningBrush"
         };
+        StatusDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, brushKey);
         UpdateButtons();
     }
 
@@ -324,6 +344,8 @@ public partial class MainWindow : Window
     {
         if (ReceiverBox.SelectedItem is Receiver receiver)
             ReceiverDetail.Text = $"{receiver.Ip}:{receiver.Port}  ·  {receiver.DeviceId}";
+        if (sender == SourceBox && SourceBox.SelectedItem is CaptureSource source)
+            _ = UpdatePreviewAsync(source);
         if (IsLoaded) SaveSettings();
         UpdateButtons();
     }

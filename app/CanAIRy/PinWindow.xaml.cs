@@ -7,6 +7,7 @@ public partial class PinWindow : System.Windows.Window
     public PinWindow()
     {
         InitializeComponent();
+        ThemeService.Attach(this);
         Loaded += (_, _) => PinBox.Focus();
     }
 
