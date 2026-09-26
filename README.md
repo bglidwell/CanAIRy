@@ -45,10 +45,25 @@ Download the current Windows x64 package from the
 - `CanAIRy-<version>-win-x64-setup.exe` — per-user installer with Start menu
   and optional desktop shortcuts. It supports silent installation and does not
   require administrator privileges.
+- `CanAIRy-<version>-win-x64.msi` — versioned, per-user Windows Installer package
+  with automatic upgrades and downgrade protection.
 - `CanAIRy-<version>-win-x64-portable.zip` — self-contained portable folder.
 
 The application is not yet Authenticode-signed, so Windows may display a
 SmartScreen warning for early releases.
+
+Choose one installer type. MSI installs into `%LOCALAPPDATA%\Programs\CanAIRy MSI`;
+the EXE uses `%LOCALAPPDATA%\Programs\CanAIRy`. They share settings and pairing
+credentials, but have separate uninstallers. Uninstall the old type when switching.
+
+Installed copies check the public GitHub Releases feed at startup and every six
+hours. Updates are downloaded, checked against the release's SHA-256 manifest,
+and installed when no casting session is active; CanAIRy then restarts. **About**
+has a manual update button and an **Update automatically when idle** setting.
+Failed installs are not retried automatically for the same version; use the
+manual button to retry. Installer logs are under `%LOCALAPPDATA%\CanAIRy\Updates`.
+Portable copies check for updates and link to the download page for manual replacement.
+Versions before this updater was introduced need one manual installation.
 
 ## Quick start
 
@@ -72,9 +87,18 @@ builds the native application on every push and pull request.
 
 ## Releases and WinGet
 
-Pushing a semantic version tag builds the Go helpers, publishes a self-contained
-Windows application, creates an Inno Setup installer and portable ZIP, generates
-SHA-256 checksums, and attaches everything to a GitHub Release.
+Every push to `main` tests and builds the Go helpers and Windows application,
+creates an MSI, an Inno Setup EXE installer, and a portable ZIP, and publishes a
+GitHub Release with SHA-256 checksums. The MSI is installed and uninstalled on the
+GitHub runner before publication. A release is published only after all packages
+and checksums are uploaded.
+
+Versioning follows Aviary: maintain the major/minor fields in
+`app/CanAIRy/CanAIRy.csproj`; the Release workflow uses its GitHub run number as the
+patch (`0.1.42`, for example). App and installer versions match, and CI creates
+the corresponding `v0.1.42` tag at the built commit. Reruns retain their version
+and never overwrite an already published release or move the latest feed backward.
+The Release workflow can also be dispatched manually from `main`.
 
 The proposed WinGet package identifier is `BobbyGlidwell.CanAIRy`. See
 [distribution/WINGET.md](distribution/WINGET.md) for initial submission and

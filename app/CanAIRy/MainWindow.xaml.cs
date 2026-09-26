@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         SourceBox.ItemsSource = _sources;
         foreach (var receiver in _settings.KnownReceivers) _receivers.Add(receiver);
         StartInTrayCheck.IsChecked = _settings.StartInTray;
+        AutomaticUpdatesCheck.IsChecked = _settings.AutomaticUpdates;
         LaunchAtSignInCheck.IsChecked = SettingsStore.LaunchAtSignIn;
         FpsBox.SelectedIndex = _settings.FramesPerSecond == 60 ? 1 : 0;
         BitrateBox.SelectedIndex = _settings.BitrateKbps switch { 4500 => 1, 8000 => 2, _ => 0 };
@@ -55,6 +56,7 @@ public partial class MainWindow : Window
             ReceiverBox.SelectedItem = _receivers.FirstOrDefault(item => item.DeviceId == _settings.SelectedDeviceId);
             await RefreshDevicesAsync();
             if (_settings.StartInTray && Environment.GetCommandLineArgs().Contains("--tray")) Hide();
+            _ = RunUpdateLoopAsync();
         };
         StateChanged += (_, _) =>
         {
@@ -153,6 +155,7 @@ public partial class MainWindow : Window
 
     private async Task StartSessionAsync(StreamOptions options)
     {
+        if (_applyingUpdate) throw new InvalidOperationException("CanAIRy is installing an update.");
         _stopRequested = false;
         _activeOptions = options with { ForcePair = false };
         await _backend.StartAsync(options, _lifetime.Token);
@@ -217,7 +220,7 @@ public partial class MainWindow : Window
     private void UpdateButtons()
     {
         var running = _backend.IsRunning;
-        StartButton.IsEnabled = !running && ReceiverBox.SelectedItem is not null && SourceBox.SelectedItem is not null;
+        StartButton.IsEnabled = !_applyingUpdate && !running && ReceiverBox.SelectedItem is not null && SourceBox.SelectedItem is not null;
         PairButton.IsEnabled = StartButton.IsEnabled;
         StopButton.IsEnabled = running;
         ReceiverBox.IsEnabled = !running;
@@ -232,6 +235,7 @@ public partial class MainWindow : Window
         _settings.BitrateKbps = BitrateBox.SelectedIndex switch { 1 => 4500, 2 => 8000, _ => 0 };
         _settings.ShowCursor = CursorCheck.IsChecked == true;
         _settings.StartInTray = StartInTrayCheck.IsChecked == true;
+        _settings.AutomaticUpdates = AutomaticUpdatesCheck.IsChecked == true;
         SettingsStore.Save(_settings);
     }
 
@@ -279,7 +283,7 @@ public partial class MainWindow : Window
             share.DropDownItems.Add(new Forms.ToolStripSeparator());
             foreach (var source in windows) AddTraySource(share, source);
         }
-        share.Enabled = !_backend.IsRunning && ReceiverBox.SelectedItem is Receiver;
+        share.Enabled = !_applyingUpdate && !_backend.IsRunning && ReceiverBox.SelectedItem is Receiver;
         menu.Items.Add(share);
 
         var stop = new Forms.ToolStripMenuItem("Stop mirroring") { Enabled = _backend.IsRunning };
@@ -322,6 +326,7 @@ public partial class MainWindow : Window
     {
         _allowExit = true;
         _lifetime.Cancel();
+        _updateClient.Dispose();
         await StopSessionAsync();
         await _backend.DisposeAsync();
         _trayIcon.Visible = false;

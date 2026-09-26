@@ -35,10 +35,18 @@ jobs:
         run: |
           Push-Location sender
           go test ./cmd/doubletake ./cmd/airplay-discover
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test ./internal/airplay -run 'Test(AirPlayResponseCache|BrowseAirPlayUnicast)'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-sender.exe .\cmd\doubletake
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-discover.exe .\cmd\airplay-discover
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
 
       - name: Build CanAIRy
         shell: pwsh
         run: dotnet build app\CanAIRy\CanAIRy.csproj --configuration Release
+
+      - name: Test update client
+        run: dotnet test tests/CanAIRy.Tests/CanAIRy.Tests.csproj --configuration Release

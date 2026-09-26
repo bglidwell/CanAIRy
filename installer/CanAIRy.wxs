@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="CanAIRy" Manufacturer="Bobby Glidwell" Version="$(var.ProductVersion)"
+           UpgradeCode="48E9A975-B13C-4A80-A8D5-7617458A4E07" Scope="perUser"
+           InstallerVersion="500" Compressed="yes">
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of CanAIRy is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="CanAIRyIcon" SourceFile="$(var.SourceIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="CanAIRyIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/bglidwell/CanAIRy" />
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="LocalProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="CanAIRy MSI">
+          <Component Id="InstallationMarker" Guid="7D9FE1A8-18D8-48D7-8CD4-46659AC3B881">
+            <File Source="$(var.MarkerFile)" Name="install-kind.txt" />
+            <RegistryValue Root="HKCU" Key="Software\CanAIRy\MSI" Name="InstallFolder"
+                           Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+            <Shortcut Id="StartMenuShortcut" Directory="ApplicationProgramsFolder" Name="CanAIRy"
+                      Target="[INSTALLFOLDER]CanAIRy.exe" WorkingDirectory="INSTALLFOLDER" Icon="CanAIRyIcon" />
+            <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+            <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="CanAIRy MSI" />
+    </StandardDirectory>
+    <Feature Id="ProductFeature" Title="CanAIRy" Level="1">
+      <ComponentRef Id="InstallationMarker" />
+      <Files Include="$(var.PublishDir)\**" Directory="INSTALLFOLDER" />
+    </Feature>
+  </Package>
+</Wix>

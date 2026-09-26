@@ -11,6 +11,8 @@ internal sealed class AppSettings
     public int BitrateKbps { get; set; }
     public bool ShowCursor { get; set; } = true;
     public bool StartInTray { get; set; } = true;
+    public bool AutomaticUpdates { get; set; } = true;
+    public string? LastUpdateAttemptVersion { get; set; }
     public List<Receiver> KnownReceivers { get; set; } = [];
 }
 

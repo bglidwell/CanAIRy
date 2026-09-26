@@ -9,7 +9,7 @@ administrator privileges.
 Microsoft requires the initial package manifest to be submitted and reviewed in
 the `microsoft/winget-pkgs` repository before updates can be automated.
 
-1. Create a stable GitHub release by pushing a tag such as `v0.1.0`.
+1. Push to `main` and wait for the automatically versioned GitHub Release.
 2. Download Microsoft's WinGet Manifest Creator with `winget install wingetcreate`.
 3. Run:
 

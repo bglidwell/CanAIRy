@@ -158,6 +158,11 @@
               <TextBlock Text="CanAIRy" FontSize="27" FontWeight="SemiBold" Margin="0,14,0,0" />
               <TextBlock Text="Wireless Display Casting" Margin="0,3,0,0" Foreground="{DynamicResource MutedBrush}" />
               <TextBlock x:Name="VersionText" Text="Version 1.0.0" Margin="0,7,0,0" Foreground="{DynamicResource SubtleBrush}" FontSize="11" />
+              <CheckBox x:Name="AutomaticUpdatesCheck" Content="Update automatically when idle" Margin="0,18,0,0"
+                        FontSize="11" Click="AutomaticUpdates_Click" />
+              <Button x:Name="CheckUpdatesButton" Content="Check for updates" Margin="0,12,0,0" Click="CheckUpdates_Click" />
+              <TextBlock x:Name="UpdateStatusText" Text="Updates come from GitHub Releases." Margin="0,8,0,0" Width="205"
+                         FontSize="11" TextWrapping="Wrap" TextAlignment="Center" Foreground="{DynamicResource MutedBrush}" />
             </StackPanel>
           </Border>
           <Border Grid.Column="2" Style="{StaticResource CardStyle}">

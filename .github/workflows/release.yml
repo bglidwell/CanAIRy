@@ -2,25 +2,19 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Package version for a test artifact (for example 0.1.0)"
-        required: true
-        default: "0.1.0"
-        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-2025
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
@@ -30,19 +24,18 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
 
-      - name: Validate version tag
+      - name: Compute release version
         id: version
         shell: pwsh
+        env:
+          RELEASE_RUN_NUMBER: ${{ github.run_number }}
         run: |
-          $candidate = if ("${{ github.event_name }}" -eq "push") {
-            "${{ github.ref_name }}".TrimStart('v')
-          } else {
-            "${{ inputs.version }}"
-          }
-          if ($candidate -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
-            throw "Version must look like 0.1.0 or 0.1.0-beta.1"
-          }
-          "version=$candidate" >> $env:GITHUB_OUTPUT
+          # Like Aviary: source owns major.minor; CI owns the numeric patch.
+          [xml]$project = Get-Content app/CanAIRy/CanAIRy.csproj
+          $base = [version]$project.Project.PropertyGroup.Version
+          $patch = [int]$env:RELEASE_RUN_NUMBER
+          if ($base.Major -gt 255 -or $base.Minor -gt 255 -or $patch -gt 65535) { throw 'Version exceeds MSI limits.' }
+          "version=$($base.Major).$($base.Minor).$patch" >> $env:GITHUB_OUTPUT
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -60,9 +53,17 @@ jobs:
         run: |
           Push-Location sender
           go test ./cmd/doubletake ./cmd/airplay-discover
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test ./internal/airplay -run 'Test(AirPlayResponseCache|BrowseAirPlayUnicast)'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-sender.exe .\cmd\doubletake
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go build -trimpath -ldflags="-s -w" -o ..\test-runtime\airplay-discover.exe .\cmd\airplay-discover
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Pop-Location
+
+      - name: Test update client
+        run: dotnet test tests/CanAIRy.Tests/CanAIRy.Tests.csproj --configuration Release
 
       - name: Publish self-contained application
         shell: pwsh
@@ -75,6 +76,7 @@ jobs:
             -p:Version=$version `
             -p:ContinuousIntegrationBuild=true `
             --output artifacts\publish
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item THIRD-PARTY-NOTICES.md artifacts\publish\
           Copy-Item sender\LICENSE artifacts\publish\DOUBLETAKE-LGPL-3.0.txt
           Copy-Item sender\COPYING.GPL artifacts\publish\GNU-GPL-3.0.txt
@@ -102,6 +104,7 @@ jobs:
           if (-not $signTool) { throw 'signtool.exe was not found' }
           & $signTool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
             /f $certificatePath /p $env:CERTIFICATE_PASSWORD artifacts\publish\CanAIRy.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $certificatePath -Force
 
       - name: Build portable archive and installer
@@ -118,8 +121,32 @@ jobs:
           if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
           if (-not (Test-Path -LiteralPath $iscc)) { throw 'Inno Setup compiler was not found' }
           & $iscc installer\CanAIRy.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./installer/build-msi.ps1 -Version $env:CANAIRY_VERSION
 
-      - name: Sign installer when certificate is configured
+      - name: Verify MSI installation and uninstall
+        shell: pwsh
+        env:
+          CANAIRY_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $package = (Resolve-Path "artifacts/release/CanAIRy-$env:CANAIRY_VERSION-win-x64.msi").Path
+          $installed = Join-Path $env:LOCALAPPDATA 'Programs/CanAIRy MSI'
+          $result = Start-Process msiexec.exe -ArgumentList @('/i', ('"' + $package + '"'), '/qn', '/norestart') -WindowStyle Hidden -Wait -PassThru
+          if ($result.ExitCode -notin @(0, 3010)) { throw "MSI install failed: $($result.ExitCode)" }
+          try {
+            foreach ($name in @('CanAIRy.exe', 'CanAIRy.dll', 'airplay-discover.exe', 'airplay-sender.exe', 'ffmpeg.exe')) {
+              if (-not (Test-Path -LiteralPath (Join-Path $installed $name))) { throw "MSI is missing $name" }
+            }
+            if ((Get-Content -LiteralPath (Join-Path $installed 'install-kind.txt') -Raw).Trim() -ne 'msi') { throw 'MSI update marker missing.' }
+            $version = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $installed 'CanAIRy.dll')).FileVersion
+            if ([version]$version -ne [version]"$env:CANAIRY_VERSION.0") { throw "Installed version mismatch: $version" }
+          } finally {
+            $result = Start-Process msiexec.exe -ArgumentList @('/x', ('"' + $package + '"'), '/qn', '/norestart') -WindowStyle Hidden -Wait -PassThru
+            if ($result.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed: $($result.ExitCode)" }
+          }
+          if (Test-Path -LiteralPath (Join-Path $installed 'CanAIRy.exe')) { throw 'MSI did not remove the application.' }
+
+      - name: Sign installers when certificate is configured
         if: ${{ steps.signing.outputs.configured == 'true' }}
         env:
           CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
@@ -133,7 +160,9 @@ jobs:
             Sort-Object FullName -Descending | Select-Object -First 1
           & $signTool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com `
             /f $certificatePath /p $env:CERTIFICATE_PASSWORD `
-            "artifacts\release\CanAIRy-$env:CANAIRY_VERSION-win-x64-setup.exe"
+            "artifacts\release\CanAIRy-$env:CANAIRY_VERSION-win-x64-setup.exe" `
+            "artifacts\release\CanAIRy-$env:CANAIRY_VERSION-win-x64.msi"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Remove-Item -LiteralPath $certificatePath -Force
 
       - name: Create checksums
@@ -152,14 +181,28 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: ${{ github.event_name == 'push' }}
         shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_COMMIT: ${{ github.sha }}
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "v$env:RELEASE_VERSION"
           $files = Get-ChildItem artifacts\release -File | ForEach-Object FullName
-          gh release view $tag *> $null
+          $existing = gh release view $tag --json isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
+            if (-not ($existing | ConvertFrom-Json).isDraft) {
+              Write-Host "$tag is already published; keeping its assets immutable."
+              exit 0
+            }
             gh release upload $tag $files --clobber
           } else {
-            gh release create $tag $files --verify-tag --generate-notes --title "CanAIRy ${{ steps.version.outputs.version }}"
+            gh release create $tag $files --draft --target $env:RELEASE_COMMIT --generate-notes --title "CanAIRy $env:RELEASE_VERSION"
           }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # A rerun of an older workflow must never move the update feed backwards.
+          $latest = gh api repos/bglidwell/CanAIRy/releases/latest --jq .tag_name 2>$null
+          $makeLatest = 'true'
+          if ($LASTEXITCODE -eq 0 -and $latest -match '^v(\d+\.\d+\.\d+)$' -and
+              [version]$Matches[1] -ge [version]$env:RELEASE_VERSION) { $makeLatest = 'false' }
+          gh release edit $tag --draft=false "--latest=$makeLatest"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

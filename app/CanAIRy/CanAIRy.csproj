@@ -23,6 +23,7 @@
     <Content Include="..\..\test-runtime\ffmpeg.exe" Link="ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="UpdateInstaller.ps1" />
     <Resource Include="Assets\CanAIRy.ico" />
     <Resource Include="Assets\CanAIRy.png" />
   </ItemGroup>

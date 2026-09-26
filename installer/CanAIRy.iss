@@ -50,6 +50,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription:
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "install-kind-exe.txt"; DestDir: "{app}"; DestName: "install-kind.txt"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\CanAIRy"; Filename: "{app}\CanAIRy.exe"
