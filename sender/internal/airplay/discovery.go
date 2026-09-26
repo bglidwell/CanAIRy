@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -85,6 +86,13 @@ func DiscoverAirPlayDevices(ctx context.Context) ([]AirPlayDevice, error) {
 		return nil, nil
 	}
 
+	if runtime.GOOS == "windows" {
+		return discoverAirPlayWindows(ctx, ifaces, traffic)
+	}
+	return discoverAirPlayMulticast(ctx, ifaces, traffic)
+}
+
+func discoverAirPlayMulticast(ctx context.Context, ifaces []net.Interface, traffic zeroconf.IPType) ([]AirPlayDevice, error) {
 	resolver, err := zeroconf.NewResolver(
 		zeroconf.SelectIfaces(ifaces),
 		zeroconf.SelectIPTraffic(traffic),
