@@ -10,10 +10,6 @@
   </p>
 </div>
 
-<p align="center">
-  <img src="docs/images/canairy-main.png" alt="CanAIRy casting dashboard in dark mode" width="860">
-</p>
-
 ## What it does
 
 CanAIRy is a native Windows tray application that discovers Apple TVs, handles
@@ -33,9 +29,7 @@ LAN. It is designed to stay out of the way until you need it.
 CanAIRy presents screens first, followed by scrollable previews of individual
 application windows—similar to the sharing experience in Teams or Zoom.
 
-<p align="center">
-  <img src="docs/images/canairy-source-picker.png" alt="CanAIRy screen and application picker" width="940">
-</p>
+Only synthetic, sanitized demonstration screenshots should be added to public documentation. Do not include a real desktop preview or a real receiver name.
 
 ## Install
 
@@ -76,9 +70,13 @@ Versions before this updater was introduced need one manual installation.
 ## Build from source
 
 The desktop application targets .NET 10 and the AirPlay helpers are written in
-Go. Build the Windows application with:
+Go. Build the helpers with Go's trimpath flag before building the Windows application:
 
 ```powershell
+Push-Location sender
+go build -trimpath -o ..\test-runtime\airplay-sender.exe .\cmd\doubletake
+go build -trimpath -o ..\test-runtime\airplay-discover.exe .\cmd\airplay-discover
+Pop-Location
 dotnet build app\CanAIRy\CanAIRy.csproj -c Release
 ```
 
@@ -87,18 +85,16 @@ builds the native application on every push and pull request.
 
 ## Releases and WinGet
 
-Every push to `main` tests and builds the Go helpers and Windows application,
-creates an MSI, an Inno Setup EXE installer, and a portable ZIP, and publishes a
-GitHub Release with SHA-256 checksums. The MSI is installed and uninstalled on the
+Releases are temporarily manual while the project reviews distribution and signing. The Release workflow tests and builds the Go helpers and Windows application, creates an MSI, an Inno Setup EXE installer, and a portable ZIP, and publishes a GitHub Release with SHA-256 checksums. The MSI is installed and uninstalled on the
 GitHub runner before publication. A release is published only after all packages
 and checksums are uploaded.
 
-Versioning follows Aviary: maintain the major/minor fields in
+Maintain the major/minor version fields in
 `app/CanAIRy/CanAIRy.csproj`; the Release workflow uses its GitHub run number as the
 patch (`0.1.42`, for example). App and installer versions match, and CI creates
 the corresponding `v0.1.42` tag at the built commit. Reruns retain their version
 and never overwrite an already published release or move the latest feed backward.
-The Release workflow can also be dispatched manually from `main`.
+Dispatch the Release workflow manually from `main` only after the release review.
 
 The proposed WinGet package identifier is `BobbyGlidwell.CanAIRy`. See
 [distribution/WINGET.md](distribution/WINGET.md) for initial submission and

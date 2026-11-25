@@ -91,7 +91,6 @@ public partial class MainWindow : Window
             _receivers.Clear();
             foreach (var receiver in found) _receivers.Add(receiver);
             ReceiverBox.SelectedItem = _receivers.FirstOrDefault(item => item.DeviceId == selectedId)
-                                       ?? _receivers.FirstOrDefault(item => item.Name.Contains("Great Room", StringComparison.OrdinalIgnoreCase))
                                        ?? _receivers.FirstOrDefault();
             SetStatus(found.Count == 0 ? "No Apple TVs found" : "Ready");
             SaveSettings();
