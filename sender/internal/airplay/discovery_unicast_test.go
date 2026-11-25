@@ -23,22 +23,22 @@ func TestAirPlayResponseCacheCombinesPackets(t *testing.T) {
 	cache := airPlayResponseCache{entries: make(map[string]*zeroconf.ServiceEntry), addresses: make(map[string][]net.IP)}
 	// Current Apple TVs include device-info and other services in their replies.
 	cache.add(&dns.Msg{Answer: []dns.RR{
-		discoveryRecord(t, "great-room.local. 10 IN A 192.168.4.117"),
-		discoveryRecord(t, `Great\ Room._device-info._tcp.local. 10 IN TXT "model=J255AP"`),
-		discoveryRecord(t, `Great\ Room._airplay._tcp.local. 10 IN TXT "model=AppleTV14,1" "osvers=27.0" "features=0x4A7FDFD5,0x3C177FDE" "fex=1d9/St5/Fzw4oY7cDg"`),
+		discoveryRecord(t, "conference-display.local. 10 IN A 192.0.2.10"),
+		discoveryRecord(t, `Conference\ Display._device-info._tcp.local. 10 IN TXT "model=ExampleModel"`),
+		discoveryRecord(t, `Conference\ Display._airplay._tcp.local. 10 IN TXT "model=ExampleTV1,1" "osvers=1.0" "features=0x80,0x0"`),
 	}})
 	if got := cache.devices(); len(got) != 0 {
 		t.Fatalf("incomplete service emitted: %+v", got)
 	}
 	cache.add(&dns.Msg{Extra: []dns.RR{
-		discoveryRecord(t, `Great\ Room._AIRPLAY._TCP.LOCAL. 10 IN SRV 0 0 7000 Great-Room.local.`),
+		discoveryRecord(t, `Conference\ Display._AIRPLAY._TCP.LOCAL. 10 IN SRV 0 0 7000 Conference-Display.local.`),
 	}})
 	devices := cache.devices()
 	if len(devices) != 1 {
 		t.Fatalf("devices = %+v", devices)
 	}
 	got := devices[0]
-	if got.Name != "Great Room" || got.IP != "192.168.4.117" || got.Port != 7000 || got.Model != "AppleTV14,1" || got.RawTXT["osvers"] != "27.0" || !got.SupportsScreen() {
+	if got.Name != "Conference Display" || got.IP != "192.0.2.10" || got.Port != 7000 || got.Model != "ExampleTV1,1" || got.RawTXT["osvers"] != "1.0" || !got.SupportsScreen() {
 		t.Fatalf("unexpected device: %+v", got)
 	}
 }
@@ -57,8 +57,8 @@ func TestBrowseAirPlayUnicastReceivesMultipleDevices(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	responses := [][]dns.RR{
-		{discoveryRecord(t, `One._airplay._tcp.local. 10 IN SRV 0 0 7000 one.local.`), discoveryRecord(t, `one.local. 10 IN A 192.168.4.40`)},
-		{discoveryRecord(t, `Two._airplay._tcp.local. 10 IN SRV 0 0 7000 two.local.`), discoveryRecord(t, `two.local. 10 IN A 192.168.4.117`)},
+		{discoveryRecord(t, `One._airplay._tcp.local. 10 IN SRV 0 0 7000 one.local.`), discoveryRecord(t, `one.local. 10 IN A 192.0.2.11`)},
+		{discoveryRecord(t, `Two._airplay._tcp.local. 10 IN SRV 0 0 7000 two.local.`), discoveryRecord(t, `two.local. 10 IN A 192.0.2.10`)},
 	}
 	serverDone := make(chan error, 1)
 	go func() {

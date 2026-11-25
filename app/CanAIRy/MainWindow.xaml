@@ -173,7 +173,7 @@
               <Border Grid.Row="2" Background="{DynamicResource DividerBrush}" />
               <Grid Grid.Row="3" Margin="0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="120" /><ColumnDefinition /></Grid.ColumnDefinitions><TextBlock Text="Created by" Foreground="{DynamicResource MutedBrush}" /><TextBlock Grid.Column="1" Text="Bobby Glidwell" FontWeight="SemiBold" /></Grid>
               <Border Grid.Row="4" Background="{DynamicResource DividerBrush}" />
-              <Grid Grid.Row="5" Margin="0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="120" /><ColumnDefinition /></Grid.ColumnDefinitions><TextBlock Text="Contact" Foreground="{DynamicResource MutedBrush}" /><TextBlock Grid.Column="1" Text="sintex+github@gmail.com" FontWeight="SemiBold" /></Grid>
+              <Grid Grid.Row="5" Margin="0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="120" /><ColumnDefinition /></Grid.ColumnDefinitions><TextBlock Text="Support" Foreground="{DynamicResource MutedBrush}" /><TextBlock Grid.Column="1" Text="GitHub Issues" FontWeight="SemiBold" /></Grid>
               <StackPanel Grid.Row="6" VerticalAlignment="Bottom"><TextBlock Text="Follows your Windows light or dark theme" Foreground="{DynamicResource MutedBrush}" /><TextBlock Text="© 2026 Bobby Glidwell" Margin="0,6,0,0" Foreground="{DynamicResource SubtleBrush}" FontSize="11" /></StackPanel>
             </Grid>
           </Border>

@@ -18,3 +18,7 @@ Desktop.ini
 test-runtime/hls/
 /artifacts/
 *.tmp
+
+# Helpers are generated with go build -trimpath; do not commit local binaries.
+/test-runtime/airplay-sender.exe
+/test-runtime/airplay-discover.exe

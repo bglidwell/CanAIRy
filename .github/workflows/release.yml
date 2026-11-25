@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -30,7 +28,7 @@ jobs:
         env:
           RELEASE_RUN_NUMBER: ${{ github.run_number }}
         run: |
-          # Like Aviary: source owns major.minor; CI owns the numeric patch.
+          # Source owns major.minor; CI owns the numeric patch.
           [xml]$project = Get-Content app/CanAIRy/CanAIRy.csproj
           $base = [version]$project.Project.PropertyGroup.Version
           $patch = [int]$env:RELEASE_RUN_NUMBER
