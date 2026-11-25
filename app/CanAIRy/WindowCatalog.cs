@@ -59,7 +59,6 @@ internal static class WindowCatalog
         {
             new() { Name = "Entire desktop", AppName = "All screens and apps" }
         };
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var ownProcessId = Environment.ProcessId;
 
         EnumWindows((handle, _) =>
@@ -70,7 +69,7 @@ internal static class WindowCatalog
             var title = new StringBuilder(1024);
             if (GetWindowText(handle, title, title.Capacity) == 0) return true;
             var windowTitle = title.ToString().Trim();
-            if (windowTitle.Length == 0 || !seen.Add(windowTitle)) return true;
+            if (windowTitle.Length == 0) return true;
 
             GetWindowThreadProcessId(handle, out var processId);
             if (processId == ownProcessId) return true;

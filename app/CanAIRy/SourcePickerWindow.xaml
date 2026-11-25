@@ -79,19 +79,21 @@
       <Grid.ColumnDefinitions><ColumnDefinition /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
       <StackPanel>
         <TextBlock Text="Choose what to share" FontSize="25" FontWeight="SemiBold" />
-        <TextBlock Text="Select a screen or an individual app window" Margin="0,3,0,0" Foreground="{DynamicResource MutedBrush}" />
+        <TextBlock x:Name="SourceHint" Text="Select a screen or an individual app window" Margin="0,3,0,0" Foreground="{DynamicResource MutedBrush}" />
       </StackPanel>
       <Button Grid.Column="1" Content="Refresh previews" VerticalAlignment="Center" Click="Refresh_Click" />
     </Grid>
 
     <ScrollViewer Grid.Row="1" Margin="22,0,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
       <StackPanel Margin="6,4,6,12">
+        <StackPanel x:Name="ScreenSection">
         <TextBlock Text="Screens" FontSize="17" FontWeight="SemiBold" Margin="6,0,0,5" />
         <TextBlock Text="Share everything visible on a display" Foreground="{DynamicResource MutedBrush}" Margin="6,0,0,8" />
         <ItemsControl ItemsSource="{Binding ScreenTiles}" ItemTemplate="{StaticResource SourceTileTemplate}">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
         </ItemsControl>
         <Border Height="1" Background="{DynamicResource DividerBrush}" Margin="6,16,6,18" />
+        </StackPanel>
         <TextBlock Text="Windows" FontSize="17" FontWeight="SemiBold" Margin="6,0,0,5" />
         <TextBlock Text="Share only one application window" Foreground="{DynamicResource MutedBrush}" Margin="6,0,0,8" />
         <ItemsControl ItemsSource="{Binding WindowTiles}" ItemTemplate="{StaticResource SourceTileTemplate}">

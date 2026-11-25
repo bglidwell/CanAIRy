@@ -1,4 +1,6 @@
 using System.Collections.ObjectModel;
+using System.Net;
+using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Controls;
 using Forms = System.Windows.Forms;
@@ -17,7 +19,10 @@ public partial class MainWindow : Window
     private bool _allowExit;
     private bool _stopRequested;
     private StreamOptions? _activeOptions;
-    private int _reconnectAttempt;
+    private bool _refreshingDevices;
+    private bool _devicesVerified;
+    private bool _applyingPreferences;
+    private CancellationTokenSource? _qualityLifetime;
     private int _previewGeneration;
 
     public MainWindow()
@@ -28,13 +33,14 @@ public partial class MainWindow : Window
         VersionText.Text = version is null ? "Version 1.0" : $"Version {version.Major}.{version.Minor}.{version.Build}";
         ReceiverBox.ItemsSource = _receivers;
         SourceBox.ItemsSource = _sources;
-        foreach (var receiver in _settings.KnownReceivers) _receivers.Add(receiver);
+
         StartInTrayCheck.IsChecked = _settings.StartInTray;
         AutomaticUpdatesCheck.IsChecked = _settings.AutomaticUpdates;
         LaunchAtSignInCheck.IsChecked = SettingsStore.LaunchAtSignIn;
         FpsBox.SelectedIndex = _settings.FramesPerSecond == 60 ? 1 : 0;
         BitrateBox.SelectedIndex = _settings.BitrateKbps switch { 4500 => 1, 8000 => 2, _ => 0 };
         CursorCheck.IsChecked = _settings.ShowCursor;
+        PresentationModeCheck.IsChecked = _settings.PresentationMode;
 
         _appIcon = LoadAppIcon();
         _trayIcon = new Forms.NotifyIcon
@@ -53,7 +59,7 @@ public partial class MainWindow : Window
         Loaded += async (_, _) =>
         {
             RefreshSources();
-            ReceiverBox.SelectedItem = _receivers.FirstOrDefault(item => item.DeviceId == _settings.SelectedDeviceId);
+
             await RefreshDevicesAsync();
             if (_settings.StartInTray && Environment.GetCommandLineArgs().Contains("--tray")) Hide();
             _ = RunUpdateLoopAsync();
@@ -83,18 +89,21 @@ public partial class MainWindow : Window
 
     private async Task RefreshDevicesAsync()
     {
+        if (_refreshingDevices || _activeOptions is not null || _backend.IsRunning) return;
+        _refreshingDevices = true;
+        _devicesVerified = false;
         try
         {
-            SetStatus("Discovering…");
-            var selectedId = (ReceiverBox.SelectedItem as Receiver)?.DeviceId;
+            SetStatus("Discovering...");
+            var selectedId = _settings.SelectedDeviceId;
             var found = await _backend.DiscoverAsync(_lifetime.Token);
             _receivers.Clear();
             foreach (var receiver in found) _receivers.Add(receiver);
-            ReceiverBox.SelectedItem = _receivers.FirstOrDefault(item => item.DeviceId == selectedId)
-                                       ?? _receivers.FirstOrDefault(item => item.Name.Contains("Great Room", StringComparison.OrdinalIgnoreCase))
-                                       ?? _receivers.FirstOrDefault();
+            ReceiverBox.SelectedItem = string.IsNullOrWhiteSpace(selectedId) ? null :
+                _receivers.FirstOrDefault(item => item.DeviceId == selectedId);
+            _devicesVerified = true;
+            ApplySharingPreferences();
             SetStatus(found.Count == 0 ? "No Apple TVs found" : "Ready");
-            SaveSettings();
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -102,17 +111,28 @@ public partial class MainWindow : Window
             SetStatus("Discovery failed");
             AppendLog(ex.Message);
         }
+        finally { _refreshingDevices = false; }
         UpdateButtons();
     }
 
     private void RefreshSources()
     {
-        var selectedTitle = (SourceBox.SelectedItem as CaptureSource)?.WindowTitle;
+        var previous = SourceBox.SelectedItem as CaptureSource;
         _sources.Clear();
-        foreach (var source in WindowCatalog.GetSources()) _sources.Add(source);
-        SourceBox.SelectedItem = _sources.FirstOrDefault(item => item.WindowTitle == selectedTitle) ?? _sources.FirstOrDefault();
+        foreach (var source in WindowCatalog.GetSources().Where(s => CastingPolicy.CanChooseSource(PresentationModeCheck.IsChecked == true, s.IsDesktop))) _sources.Add(source);
+        SourceBox.SelectedItem = previous is null ? null : _sources.FirstOrDefault(item =>
+            item.WindowHandle == previous.WindowHandle && item.WindowTitle == previous.WindowTitle);
+        if (SourceBox.SelectedItem is null) ClearPreview();
     }
 
+    private void ClearPreview()
+    {
+        Interlocked.Increment(ref _previewGeneration);
+        PreviewTitle.Text = "Choose a source";
+        SelectedSourceSubtitle.Text = "Select what to share";
+        PreviewImage.Source = null;
+        PreviewPlaceholder.Visibility = Visibility.Visible;
+    }
     private async Task UpdatePreviewAsync(CaptureSource source)
     {
         var generation = Interlocked.Increment(ref _previewGeneration);
@@ -133,6 +153,16 @@ public partial class MainWindow : Window
     {
         var receiver = ReceiverBox.SelectedItem as Receiver ?? throw new InvalidOperationException("Select an Apple TV");
         var source = SourceBox.SelectedItem as CaptureSource ?? throw new InvalidOperationException("Select what to share");
+        if (!_devicesVerified || _refreshingDevices || !_receivers.Contains(receiver))
+            throw new InvalidOperationException("Refresh and select an available Apple TV first.");
+        if (!CastingPolicy.CanChooseSource(PresentationModeCheck.IsChecked == true, source.IsDesktop))
+            throw new InvalidOperationException("Presentation mode only permits an individual window.");
+        if (!source.IsDesktop)
+        {
+            var windows = WindowCatalog.GetSources().Select(s => (s.WindowTitle, s.WindowHandle, s.AppName));
+            if (!CastingPolicy.MatchesWindow(source.WindowTitle, source.WindowHandle, source.AppName, windows))
+                throw new InvalidOperationException("This window has changed or its title is ambiguous. Choose a uniquely titled window before casting.");
+        }
         var fps = int.Parse(((ComboBoxItem)FpsBox.SelectedItem).Tag.ToString()!);
         var bitrate = int.Parse(((ComboBoxItem)BitrateBox.SelectedItem).Tag.ToString()!);
         return new StreamOptions(receiver, source, fps, bitrate, CursorCheck.IsChecked == true, forcePair);
@@ -156,38 +186,82 @@ public partial class MainWindow : Window
     private async Task StartSessionAsync(StreamOptions options)
     {
         if (_applyingUpdate) throw new InvalidOperationException("CanAIRy is installing an update.");
+        if (_activeOptions is not null || _backend.IsRunning) throw new InvalidOperationException("A cast is already active.");
         _stopRequested = false;
         _activeOptions = options with { ForcePair = false };
-        await _backend.StartAsync(options, _lifetime.Token);
         UpdateButtons();
-    }
-
-    private async Task SenderExitedAsync(int exitCode)
-    {
-        UpdateButtons();
-        if (_stopRequested || _activeOptions is null || exitCode == 0) return;
-        if (_reconnectAttempt >= 4)
-        {
-            SetStatus("Connection lost");
-            AppendLog("Automatic reconnect stopped after four attempts.");
-            return;
-        }
-        var delay = TimeSpan.FromSeconds(Math.Pow(2, _reconnectAttempt));
-        _reconnectAttempt++;
-        SetStatus($"Reconnecting in {delay.TotalSeconds:0}s…");
         try
         {
-            await Task.Delay(delay, _lifetime.Token);
-            await _backend.StartAsync(_activeOptions, _lifetime.Token);
+            SaveSettings();
+            await _backend.StartAsync(options, _lifetime.Token);
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
-        {
-            AppendLog("Reconnect failed: " + ex.Message);
-            await SenderExitedAsync(1);
-        }
+        catch { _activeOptions = null; UpdateButtons(); throw; }
+        UpdateButtons();
     }
 
+    private Task SenderExitedAsync(int exitCode)
+    {
+        if (_allowExit) return Task.CompletedTask;
+        var interrupted = CastingPolicy.WasInterrupted(_stopRequested, _activeOptions is not null);
+        _activeOptions = null;
+        StopQualityMonitor();
+        if (interrupted)
+        {
+            // Capture never resumes automatically, even for a previously paired device.
+            SourceBox.SelectedItem = null;
+            _devicesVerified = false;
+            SetStatus("Connection lost - select again");
+            AppendLog("Cast ended. Refresh the receiver and choose a source to reconnect.");
+            _trayIcon.ShowBalloonTip(5000, ProductInfo.DisplayName, "Cast ended. Open CanAIRy to reconnect.", Forms.ToolTipIcon.Warning);
+        }
+        else SetStatus("Ready");
+        UpdateButtons();
+        return Task.CompletedTask;
+    }
+
+    private void StopQualityMonitor()
+    {
+        _qualityLifetime?.Cancel();
+        _qualityLifetime = null;
+        NetworkQualityText.Text = "Network quality: not casting";
+    }
+
+    private async Task MonitorQualityAsync(StreamOptions options)
+    {
+        if (_qualityLifetime is not null) return;
+        if (!IPAddress.TryParse(options.Receiver.Ip, out var address))
+        {
+            NetworkQualityText.Text = "Network quality: unavailable";
+            return;
+        }
+        var lifetime = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _qualityLifetime = lifetime;
+        using var ping = new Ping();
+        try
+        {
+            while (!lifetime.IsCancellationRequested)
+            {
+                string status;
+                try
+                {
+                    var reply = await ping.SendPingAsync(address, 1000);
+                    status = reply.Status == IPStatus.Success
+                        ? CastingPolicy.FormatRoundTrip(reply.RoundtripTime)
+                        : CastingPolicy.FormatRoundTrip(null);
+                }
+                catch (Exception ex) when (ex is PingException or InvalidOperationException or System.Security.SecurityException) { status = "Receiver RTT: unavailable"; }
+                if (lifetime.IsCancellationRequested || _qualityLifetime != lifetime) return;
+                NetworkQualityText.Text = status;
+                await Task.Delay(TimeSpan.FromSeconds(5), lifetime.Token);
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (_qualityLifetime == lifetime) _qualityLifetime = null;
+            lifetime.Dispose();
+        }
+    }
     private Task<string?> RequestPinAsync()
     {
         return Dispatcher.InvokeAsync(() =>
@@ -200,10 +274,14 @@ public partial class MainWindow : Window
     private void SetStatus(string status)
     {
         StatusText.Text = status;
+        if (status == "Mirroring" && _activeOptions is { } casting && !_stopRequested)
+            _ = MonitorQualityAsync(casting);
+        if (status is "Connection lost" or "Disconnected") StopQualityMonitor();
+        _trayIcon.Text = status == "Mirroring" ? "CanAIRy: casting" : ProductInfo.DisplayName;
         var brushKey = status switch
         {
             "Mirroring" => "SuccessBrush",
-            "Connection lost" or "Disconnected" or "Discovery failed" => "DangerBrush",
+            "Connection lost" or "Connection lost - select again" or "Disconnected" or "Discovery failed" => "DangerBrush",
             "Ready" => "AccentBrush",
             _ => "WarningBrush"
         };
@@ -219,26 +297,65 @@ public partial class MainWindow : Window
 
     private void UpdateButtons()
     {
-        var running = _backend.IsRunning;
-        StartButton.IsEnabled = !_applyingUpdate && !running && ReceiverBox.SelectedItem is not null && SourceBox.SelectedItem is not null;
+        if (!IsLoaded) return;
+        var active = _backend.IsRunning || _activeOptions is not null;
+        StartButton.IsEnabled = CastingPolicy.CanStart(_devicesVerified, _refreshingDevices, active, _applyingUpdate, ReceiverBox.SelectedItem is not null, SourceBox.SelectedItem is not null);
         PairButton.IsEnabled = StartButton.IsEnabled;
-        StopButton.IsEnabled = running;
-        ReceiverBox.IsEnabled = !running;
-        SourceBox.IsEnabled = !running;
+        StopButton.IsEnabled = _backend.IsRunning;
+        ReceiverBox.IsEnabled = !active && !_refreshingDevices;
+        SourceBox.IsEnabled = !active;
+        FpsBox.IsEnabled = !active;
+        BitrateBox.IsEnabled = !active;
+        CursorCheck.IsEnabled = !active;
+        PresentationModeCheck.IsEnabled = !active;
+    }
+
+    private void ApplySharingPreferences()
+    {
+        if (ReceiverBox.SelectedItem is not Receiver receiver || string.IsNullOrWhiteSpace(receiver.DeviceId) ||
+            !_settings.ReceiverPreferences.TryGetValue(receiver.DeviceId, out var preferences)) return;
+        _applyingPreferences = true;
+        try
+        {
+            FpsBox.SelectedIndex = preferences.FramesPerSecond == 60 ? 1 : 0;
+            BitrateBox.SelectedIndex = preferences.BitrateKbps switch { 4500 => 1, 8000 => 2, _ => 0 };
+            CursorCheck.IsChecked = preferences.ShowCursor;
+        }
+        finally { _applyingPreferences = false; }
     }
 
     private void SaveSettings()
     {
-        _settings.SelectedDeviceId = (ReceiverBox.SelectedItem as Receiver)?.DeviceId;
-        _settings.KnownReceivers = _receivers.ToList();
+        if (_refreshingDevices || _applyingPreferences || !IsLoaded) return;
         _settings.FramesPerSecond = FpsBox.SelectedIndex == 1 ? 60 : 30;
         _settings.BitrateKbps = BitrateBox.SelectedIndex switch { 1 => 4500, 2 => 8000, _ => 0 };
         _settings.ShowCursor = CursorCheck.IsChecked == true;
+        _settings.PresentationMode = PresentationModeCheck.IsChecked == true;
+        if (ReceiverBox.SelectedItem is Receiver receiver && !string.IsNullOrWhiteSpace(receiver.DeviceId))
+        {
+            _settings.SelectedDeviceId = receiver.DeviceId;
+            _settings.ReceiverPreferences[receiver.DeviceId] = new(
+                _settings.FramesPerSecond, _settings.BitrateKbps, _settings.ShowCursor);
+        }
+        _settings.KnownReceivers = _receivers.ToList();
         _settings.StartInTray = StartInTrayCheck.IsChecked == true;
         _settings.AutomaticUpdates = AutomaticUpdatesCheck.IsChecked == true;
         SettingsStore.Save(_settings);
     }
 
+    private void SharingPreference_Changed(object sender, RoutedEventArgs e)
+    {
+        if (IsLoaded) SaveSettings();
+    }
+
+    private void PresentationMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (_activeOptions is not null || _backend.IsRunning) return;
+        SourceBox.SelectedItem = null;
+        RefreshSources();
+        SaveSettings();
+        UpdateButtons();
+    }
     private void ShowSettings()
     {
         Show();
@@ -258,7 +375,7 @@ public partial class MainWindow : Window
         settings.Click += (_, _) => Dispatcher.Invoke(ShowSettings);
         menu.Items.Add(settings);
 
-        var devices = new Forms.ToolStripMenuItem("Apple TV");
+        var devices = new Forms.ToolStripMenuItem("Apple TV") { Enabled = _activeOptions is null && !_backend.IsRunning && _devicesVerified && !_refreshingDevices };
         foreach (var receiver in _receivers)
         {
             var item = new Forms.ToolStripMenuItem(receiver.Name)
@@ -276,14 +393,14 @@ public partial class MainWindow : Window
         menu.Items.Add(devices);
 
         var share = new Forms.ToolStripMenuItem("Start mirroring");
-        AddTraySource(share, new CaptureSource { Name = "Entire desktop" });
+        if (PresentationModeCheck.IsChecked != true) AddTraySource(share, new CaptureSource { Name = "Entire desktop" });
         var windows = WindowCatalog.GetSources().Where(source => !source.IsDesktop).Take(25).ToArray();
         if (windows.Length > 0)
         {
             share.DropDownItems.Add(new Forms.ToolStripSeparator());
             foreach (var source in windows) AddTraySource(share, source);
         }
-        share.Enabled = !_applyingUpdate && !_backend.IsRunning && ReceiverBox.SelectedItem is Receiver;
+        share.Enabled = !_applyingUpdate && !_backend.IsRunning && _activeOptions is null && _devicesVerified && !_refreshingDevices && ReceiverBox.SelectedItem is Receiver;
         menu.Items.Add(share);
 
         var stop = new Forms.ToolStripMenuItem("Stop mirroring") { Enabled = _backend.IsRunning };
@@ -305,7 +422,10 @@ public partial class MainWindow : Window
         {
             try
             {
-                SourceBox.SelectedItem = _sources.FirstOrDefault(candidate => candidate.WindowTitle == source.WindowTitle) ?? source;
+                if (_activeOptions is not null || _backend.IsRunning) return;
+                RefreshSources();
+                SourceBox.SelectedItem = _sources.FirstOrDefault(candidate =>
+                    candidate.WindowHandle == source.WindowHandle && candidate.WindowTitle == source.WindowTitle);
                 await StartSessionAsync(SelectedOptions(false));
             }
             catch (Exception ex) { System.Windows.MessageBox.Show(ex.Message, ProductInfo.DisplayName); }
@@ -316,8 +436,7 @@ public partial class MainWindow : Window
     private async Task StopSessionAsync()
     {
         _stopRequested = true;
-        _activeOptions = null;
-        _reconnectAttempt = 0;
+        StopQualityMonitor();
         await _backend.StopAsync();
         UpdateButtons();
     }
@@ -336,13 +455,14 @@ public partial class MainWindow : Window
     }
 
     private async void RefreshDevices_Click(object sender, RoutedEventArgs e) => await RefreshDevicesAsync();
-    private void RefreshSources_Click(object sender, RoutedEventArgs e) { RefreshSources(); UpdateButtons(); }
+    private void RefreshSources_Click(object sender, RoutedEventArgs e) { if (_activeOptions is null && !_backend.IsRunning) RefreshSources(); UpdateButtons(); }
     private void ChooseSource_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            var available = WindowCatalog.GetSources();
-            var picker = new SourcePickerWindow(available, SourceBox.SelectedItem as CaptureSource) { Owner = this };
+            if (_activeOptions is not null || _backend.IsRunning) return;
+            var available = WindowCatalog.GetSources().Where(s => CastingPolicy.CanChooseSource(PresentationModeCheck.IsChecked == true, s.IsDesktop)).ToArray();
+            var picker = new SourcePickerWindow(available, SourceBox.SelectedItem as CaptureSource, PresentationModeCheck.IsChecked == true) { Owner = this };
             if (picker.ShowDialog() != true || picker.SelectedSource is not { } selected) return;
 
             _sources.Clear();
@@ -368,14 +488,26 @@ public partial class MainWindow : Window
     }
     private void Selection_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (ReceiverBox.SelectedItem is Receiver receiver)
-            ReceiverDetail.Text = $"{receiver.Ip}:{receiver.Port}  ·  {receiver.DeviceId}";
-        if (sender == SourceBox && SourceBox.SelectedItem is CaptureSource source)
+        if (!IsLoaded) return;
+        if (sender == ReceiverBox)
         {
-            SelectedSourceSubtitle.Text = source.Subtitle;
-            _ = UpdatePreviewAsync(source);
+            if (ReceiverBox.SelectedItem is Receiver receiver)
+            {
+                ReceiverDetail.Text = $"{receiver.Ip}:{receiver.Port}  ·  {receiver.DeviceId}";
+                ApplySharingPreferences();
+            }
+            else ReceiverDetail.Text = "Select an available receiver";
         }
-        if (IsLoaded) SaveSettings();
+        if (sender == SourceBox)
+        {
+            if (SourceBox.SelectedItem is CaptureSource source)
+            {
+                SelectedSourceSubtitle.Text = source.Subtitle;
+                _ = UpdatePreviewAsync(source);
+            }
+            else ClearPreview();
+        }
+        SaveSettings();
         UpdateButtons();
     }
 }
