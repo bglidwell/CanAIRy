@@ -24,6 +24,10 @@ LAN. It is designed to stay out of the way until you need it.
 - Pair using the PIN displayed by the receiver and remember known devices.
 - Share an entire screen or only one visible application window.
 - Choose from live visual previews, with screens listed first.
+- Use presentation mode to remove the full-desktop option. Choose a uniquely titled window; this reduces accidental sharing but is not a guarantee that sensitive content inside the window is hidden.
+- Remember the last chosen receiver by its device ID and its frame rate, quality and cursor preferences. A fresh discovery is required and the source must be selected explicitly.
+- Reconnect deliberately after an unexpected disconnect: refresh receivers, choose the intended source, then start casting again. Casting never resumes automatically.
+- During an active cast, the Activity tab shows the selected receiver's ICMP round-trip time. This is not video latency; a blocked ping does not prove poor streaming performance.
 - Adjust frame rate, stream quality, and cursor visibility.
 - Start, stop, and switch destinations from the system tray.
 - Follow the Windows light or dark theme automatically.

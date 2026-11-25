@@ -10,11 +10,15 @@ internal sealed class AppSettings
     public int FramesPerSecond { get; set; } = 30;
     public int BitrateKbps { get; set; }
     public bool ShowCursor { get; set; } = true;
+    public bool PresentationMode { get; set; }
+    public Dictionary<string, SharingPreferences> ReceiverPreferences { get; set; } = [];
     public bool StartInTray { get; set; } = true;
     public bool AutomaticUpdates { get; set; } = true;
     public string? LastUpdateAttemptVersion { get; set; }
     public List<Receiver> KnownReceivers { get; set; } = [];
 }
+
+internal sealed record SharingPreferences(int FramesPerSecond, int BitrateKbps, bool ShowCursor);
 
 internal static class SettingsStore
 {
@@ -32,7 +36,11 @@ internal static class SettingsStore
         try
         {
             if (File.Exists(SettingsPath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new AppSettings();
+            {
+                var settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), JsonOptions) ?? new AppSettings();
+                settings.ReceiverPreferences ??= [];
+                return settings;
+            }
         }
         catch { }
         return new AppSettings();

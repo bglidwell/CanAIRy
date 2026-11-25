@@ -8,18 +8,25 @@ namespace CanAIRy;
 public partial class SourcePickerWindow : Window
 {
     private IReadOnlyList<CaptureSource> _sources;
+    private readonly bool _windowOnly;
     private readonly CancellationTokenSource _lifetime = new();
 
     public ObservableCollection<SourceTile> ScreenTiles { get; } = [];
     public ObservableCollection<SourceTile> WindowTiles { get; } = [];
     public CaptureSource? SelectedSource { get; private set; }
 
-    public SourcePickerWindow(IReadOnlyList<CaptureSource> sources, CaptureSource? selectedSource)
+    public SourcePickerWindow(IReadOnlyList<CaptureSource> sources, CaptureSource? selectedSource, bool windowOnly = false)
     {
         InitializeComponent();
         ThemeService.Attach(this);
         DataContext = this;
         _sources = sources;
+        _windowOnly = windowOnly;
+        if (_windowOnly)
+        {
+            ScreenSection.Visibility = Visibility.Collapsed;
+            SourceHint.Text = "Presentation mode: select an individual app window";
+        }
         SelectedSource = selectedSource;
         PopulateTiles();
         Loaded += async (_, _) => await LoadVisibleThumbnailsAsync();
@@ -29,7 +36,7 @@ public partial class SourcePickerWindow : Window
     private void PopulateTiles()
     {
         ScreenTiles.Clear();
-        foreach (var source in _sources.Where(source => source.IsDesktop))
+        foreach (var source in _sources.Where(source => source.IsDesktop && !_windowOnly))
             ScreenTiles.Add(CreateTile(source));
         WindowTiles.Clear();
         foreach (var source in _sources.Where(source => !source.IsDesktop))
@@ -69,7 +76,7 @@ public partial class SourcePickerWindow : Window
 
     private void SourceTile_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is not SourceTile tile) return;
+        if ((sender as FrameworkElement)?.Tag is not SourceTile tile || (_windowOnly && tile.Source.IsDesktop)) return;
         SelectedSource = tile.Source;
         DialogResult = true;
     }
